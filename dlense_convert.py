@@ -21,7 +21,7 @@ class ExportContext:
 
     # Set new .csv file name
     now = datetime.datetime.now()
-    newcsvname = now.strftime("%d_%m_%Y-%H_%M_%S") + ".csv"
+    newcsvname = "output/" + now.strftime("%d_%m_%Y-%H_%M_%S") + ".csv"
 
     # For each card, match the id to the apk database and with scryfall_id search further data from Scryfall database.
     with open(newcsvname, "a", encoding="utf-8") as file:
