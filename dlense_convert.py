@@ -1,6 +1,7 @@
 import argparse
 import datetime
 from functools import lru_cache
+import os
 import sys
 import json
 import sqlite3
@@ -177,13 +178,22 @@ class ExportContext:
 
 #def main(argv):
 if __name__ == "__main__":
-  #main(sys.argv[1:])
+  if not os.path.exists("output"): 
+    os.makedirs("output") 
   parser = argparse.ArgumentParser()
   parser.add_argument("dlens")
   parser.add_argument("-c", "--csv", action="store_true")
 
   dldb = "externalres/data.db"
   scryfalldb = "externalres/scryfall.json"
+  if not os.path.exists(dldb):
+    print("Delver lense database not found at " + dldb)
+    exit(1)
+  
+  if not os.path.exists(scryfalldb):
+    print("Scryfall database not found at " + scryfalldb)
+    exit(1)
+
   app = ExportContext(scryfalldb, dldb)
   args = parser.parse_args()
   if (args.csv):
