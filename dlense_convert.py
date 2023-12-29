@@ -1,3 +1,4 @@
+import argparse
 import datetime
 from functools import lru_cache
 import sys
@@ -9,15 +10,71 @@ class ExportContext:
   apkc = None
   dlensc = None
 
-  def convertToCsv(self, apkdatabase, offlinescryfall, dlens):
+  def __init__(self, offlinescryfall, apkdb):
     self.offlinescryfall = offlinescryfall
-    # Open both SQLite files
-    self.connectapkdatabase(apkdatabase)
-    self.connectdlensdatabase(dlens)
+    # Open apkdb SQLite file
+    self.connectapkdatabase(apkdb)
 
-    # Get all cards from .dlens file
+  def getCards(self, dlens):
+    # Open dlens SQLit files
+    self.connectdlensdatabase(dlens)
     self.dlensc.execute('SELECT * from cards')
-    cardstoimport = self.dlensc.fetchall()
+    return self.dlensc.fetchall()
+  
+  def convertToDecklist(self, dlens: str):
+    #self.offlinescryfall = offlinescryfall
+    # Get all cards from .dlens file
+    #self.dlensc.execute('SELECT * from cards')
+    cardstoimport = self.getCards(dlens)#self.dlensc.fetchall()
+
+    # Set new .csv file name
+    now = datetime.datetime.now()
+    newfilename = "output/" + now.strftime("%d_%m_%Y-%H_%M_%S") + ".txt"
+    exportCards = {}
+    # For each card, match the id to the apk database and with scryfall_id search further data from Scryfall database.
+    with open(newfilename, "a", encoding="utf-8") as file:
+      total = len(cardstoimport)
+      errors = 0
+      for iteration, each in enumerate(cardstoimport):
+        if iteration == 0:
+          print("Preparing files, this might take a bit...")
+          self.access_file()
+        id = each[1]
+        foil = each[2]
+        quantity = each[4]
+        carddata = self.getcarddatabyid(id)
+        print(f"[ {iteration + 1} / {total} ] Getting data for ID: {id}")
+
+        if carddata is None:
+          print("[", iteration + 1, "/", total, "] Card could not be found from the Scryfall .json with ID:", id)
+          errors = errors + 1
+          continue
+
+        number = carddata['collector_number']
+        language = each[10]
+
+        # Fix names from Scryfall to Deckbox
+        name = carddata['name']
+        if name == "Solitary Hunter // One of the Pack":
+          name = "Solitary Hunter"
+
+        if name in exportCards:
+          exportCards[name] += quantity
+        else:
+          exportCards[name] = quantity
+      for cardName in exportCards:
+        file.write(f"{exportCards[cardName]} {cardName}\n")
+    if errors > 0:
+      print(f"Successfully imported {total - errors} entries into {newfilename}")
+      print(f"There was {errors} error(s) finding correct IDs from the Scryfall .json. To fix this, please use a larger Scryfall bulk data file such as 'All Cards' instead of 'Default Cards'.")
+    else:
+      print(f"Successfully imported {total} entries into {newfilename}")
+
+  def convertToCsv(self, dlens: str):
+    #self.offlinescryfall = offlinescryfall
+    # Get all cards from .dlens file
+    #self.dlensc.execute('SELECT * from cards')
+    cardstoimport = self.getCards(dlens)#self.dlensc.fetchall()
 
     # Set new .csv file name
     now = datetime.datetime.now()
@@ -118,11 +175,18 @@ class ExportContext:
     except TypeError:
       return None
 
-def main(argv):
-   app = ExportContext()
-   dldb = "externalres/data.db"
-   scryfalldb = "externalres/scryfall.json"
-   app.convertToCsv(dldb, scryfalldb, argv[0])
-
+#def main(argv):
 if __name__ == "__main__":
-   main(sys.argv[1:])
+  #main(sys.argv[1:])
+  parser = argparse.ArgumentParser()
+  parser.add_argument("dlens")
+  parser.add_argument("-c", "--csv", action="store_true")
+
+  dldb = "externalres/data.db"
+  scryfalldb = "externalres/scryfall.json"
+  app = ExportContext(scryfalldb, dldb)
+  args = parser.parse_args()
+  if (args.csv):
+    app.convertToCsv(args.dlens)
+  else:
+    app.convertToDecklist(args.dlens)
